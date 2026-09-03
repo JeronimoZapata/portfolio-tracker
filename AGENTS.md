@@ -92,7 +92,9 @@ Design BUY and SELL support from the start even if early usage is purchase-heavy
 - Unrealized P/L is market value minus the remaining position cost.
 - Return percentage is unrealized P/L divided by the remaining position cost, multiplied by 100.
 - Total result is realized plus unrealized P/L.
-- Fees must be included correctly in cost and realized/unrealized results.
+- MVP fee policy: retain the `fees` field as a future-compatible placeholder,
+  require it to be zero, and exclude it from all calculations. Adding real fees
+  later is an explicit financial-rule change that requires new tests.
 - Do not use naive JavaScript floating-point arithmetic for financial values. Use PostgreSQL `numeric`/`decimal` plus a suitable decimal-arithmetic strategy in TypeScript.
 - Support high precision for cryptocurrency quantities such as `0.00015382 BTC`.
 
@@ -146,7 +148,8 @@ Give special attention to unit tests for financial-domain logic. At minimum cove
 - Multiple purchases: weighted-average cost.
 - Partial sale: remaining quantity, remaining cost, and realized gain/loss.
 - Full close: zero remaining quantity and correct realized result.
-- Fee effects.
+- Zero-fee validation for the MVP; fee effects are deferred until the rule is
+  explicitly changed.
 - Cryptocurrency quantities with many decimal places.
 
 ## Working method

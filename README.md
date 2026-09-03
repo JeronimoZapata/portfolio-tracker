@@ -25,9 +25,7 @@ pnpm test:ci
 pnpm build
 ```
 
-`test:ci` permite temporalmente una suite vacía durante el bootstrap. La opción
-`--passWithNoTests` debe retirarse cuando se agreguen las primeras pruebas de
-lógica de negocio.
+`test:ci` ejecuta la suite de pruebas de lógica de negocio con Vitest.
 
 ## Flujo de trabajo
 
