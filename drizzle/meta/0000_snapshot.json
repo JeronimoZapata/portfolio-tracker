@@ -82,10 +82,7 @@
         "assets_provider_provider_identifier_unique": {
           "name": "assets_provider_provider_identifier_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "provider",
-            "provider_identifier"
-          ]
+          "columns": ["provider", "provider_identifier"]
         }
       },
       "policies": {},
@@ -245,12 +242,8 @@
           "name": "transactions_asset_id_assets_id_fk",
           "tableFrom": "transactions",
           "tableTo": "assets",
-          "columnsFrom": [
-            "asset_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["asset_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -283,27 +276,17 @@
     "public.asset_provider": {
       "name": "asset_provider",
       "schema": "public",
-      "values": [
-        "ALPACA",
-        "COINGECKO"
-      ]
+      "values": ["ALPACA", "COINGECKO"]
     },
     "public.asset_type": {
       "name": "asset_type",
       "schema": "public",
-      "values": [
-        "STOCK",
-        "ETF",
-        "CRYPTO"
-      ]
+      "values": ["STOCK", "ETF", "CRYPTO"]
     },
     "public.transaction_type": {
       "name": "transaction_type",
       "schema": "public",
-      "values": [
-        "BUY",
-        "SELL"
-      ]
+      "values": ["BUY", "SELL"]
     }
   },
   "schemas": {},
