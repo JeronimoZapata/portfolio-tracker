@@ -15,6 +15,26 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
+### PostgreSQL local
+
+Copiá `.env.example` como `.env.local`, iniciá la base local y aplicá las
+migraciones versionadas:
+
+```bash
+docker compose up -d postgres
+pnpm db:migrate
+```
+
+Para generar y revisar cambios de esquema:
+
+```bash
+pnpm db:generate
+pnpm db:check
+```
+
+El volumen conserva los datos entre reinicios. Para reiniciar la base de datos
+local de forma explícita, ejecutá `docker compose down -v`.
+
 Los mismos controles que ejecuta GitHub Actions están disponibles localmente:
 
 ```bash

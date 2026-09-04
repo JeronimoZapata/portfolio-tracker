@@ -1,6 +1,21 @@
 export type DecimalInput = string;
 
 export type TransactionType = "BUY" | "SELL";
+export type AssetType = "STOCK" | "ETF" | "CRYPTO";
+export type AssetProvider = "ALPACA" | "COINGECKO";
+
+export interface Asset {
+  readonly id: string;
+  readonly symbol: string;
+  readonly name: string;
+  readonly type: AssetType;
+  readonly provider: AssetProvider;
+  readonly providerIdentifier: string;
+  readonly currency: string;
+  readonly exchange: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
 
 export interface PortfolioTransaction {
   readonly id: string;
@@ -9,6 +24,14 @@ export interface PortfolioTransaction {
   readonly unitPrice: DecimalInput;
   readonly fees: DecimalInput;
   readonly transactionDate: string;
+}
+
+export interface Transaction extends PortfolioTransaction {
+  readonly assetId: string;
+  readonly currency: string;
+  readonly notes: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
 }
 
 export interface PositionResult {

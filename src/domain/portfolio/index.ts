@@ -11,4 +11,8 @@ export type {
   PositionResult,
   TransactionType,
   ValuedPositionResult,
+  Asset,
+  AssetType,
+  AssetProvider,
+  Transaction,
 } from "./types";
