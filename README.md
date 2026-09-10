@@ -15,6 +15,34 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
+### Desarrollo y pruebas con Docker
+
+La imagen `development` ejecuta Next.js con el código montado desde el host,
+volúmenes Linux separados para dependencias y `.next`, y polling habilitado
+para conservar Fast Refresh:
+
+```bash
+pnpm docker:dev
+```
+
+Las pruebas usan otra imagen y un PostgreSQL efímero sin puerto publicado. El
+runner aplica las migraciones y ejecuta formato, lint, tipos, tests y build:
+
+```bash
+pnpm docker:test
+```
+
+Para dejar Vitest observando cambios en caliente:
+
+```bash
+pnpm docker:test:watch
+```
+
+Los contenedores no copian archivos `.env.local` ni secretos; sus conexiones
+usan nombres de servicio internos de Compose. Los cambios de código se
+reflejan sin reconstruir la imagen. Solo los cambios de dependencias requieren
+volver a construirla.
+
 ### PostgreSQL local
 
 Copiá `.env.example` como `.env.local`, iniciá la base local y aplicá las

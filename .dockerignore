@@ -1,0 +1,11 @@
+.git
+.next
+node_modules
+coverage
+.pnpm-store
+.env
+.env.*
+!.env.example
+*.log
+Dockerfile*
+compose*.yml

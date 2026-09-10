@@ -20,6 +20,9 @@
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:migrate": "drizzle-kit migrate",
+    "docker:dev": "docker compose up --build app",
+    "docker:test": "docker compose run --rm test",
+    "docker:test:watch": "docker compose --profile test-watch up --build test-watch",
     "test:db": "vitest run src/db"
   },
   "dependencies": {
