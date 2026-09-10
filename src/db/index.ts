@@ -21,3 +21,4 @@ export const db = createDb();
 export type Database = typeof db;
 
 export * from "./repositories";
+export { DrizzleTransactionUnitOfWork } from "./transaction-unit-of-work";

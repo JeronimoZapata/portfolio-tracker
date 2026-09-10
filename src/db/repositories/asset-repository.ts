@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 
 import type { Database } from "../index";
 import { assets } from "../schema";
@@ -36,6 +36,28 @@ export class DrizzleAssetRepository implements AssetRepository {
       .where(eq(assets.id, validateId("id", id)))
       .limit(1);
     return row ? toDomainAsset(row) : null;
+  }
+
+  async lockById(id: string): Promise<Asset | null> {
+    const [row] = await this.database
+      .select()
+      .from(assets)
+      .where(eq(assets.id, validateId("id", id)))
+      .for("update")
+      .limit(1);
+    return row ? toDomainAsset(row) : null;
+  }
+
+  async lockMany(ids: readonly string[]): Promise<Asset[]> {
+    const validatedIds = [...new Set(ids)].map((id) => validateId("id", id));
+    if (validatedIds.length === 0) return [];
+    const rows = await this.database
+      .select()
+      .from(assets)
+      .where(inArray(assets.id, validatedIds))
+      .orderBy(asc(assets.id))
+      .for("update");
+    return rows.map(toDomainAsset);
   }
 
   async list(): Promise<Asset[]> {
