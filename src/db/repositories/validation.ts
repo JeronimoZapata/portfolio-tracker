@@ -177,6 +177,7 @@ export function validateTransactionInput(
   input: CreateTransactionInput | UpdateTransactionInput,
   partial: boolean,
 ): CreateTransactionInput | UpdateTransactionInput {
+  if (input.id !== undefined) input.id = uuid("id", input.id);
   if (!partial || input.assetId !== undefined)
     input.assetId = uuid("assetId", input.assetId);
   if (!partial || input.type !== undefined) {

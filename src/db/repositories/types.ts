@@ -27,6 +27,8 @@ export interface AssetRepository {
 }
 
 export type CreateTransactionInput = {
+  /** Optional for direct repository callers; application services provide it. */
+  id?: string;
   assetId: string;
   type: TransactionType;
   quantity: string;

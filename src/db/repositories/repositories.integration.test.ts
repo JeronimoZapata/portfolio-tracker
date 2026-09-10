@@ -9,6 +9,7 @@ import * as schema from "../schema";
 import type { Database } from "../index";
 import { DrizzleAssetRepository } from "./asset-repository";
 import { DrizzleTransactionRepository } from "./transaction-repository";
+import { DrizzleTransactionUnitOfWork } from "../transaction-unit-of-work";
 
 config({ path: ".env.local" });
 config();
@@ -122,5 +123,32 @@ run("Drizzle repositories", () => {
     });
     transactionIds.push(transaction.id);
     await expect(assets.delete(assetId)).rejects.toThrow();
+  });
+
+  it("provides an atomic, row-locked transaction mutation context", async () => {
+    const unitOfWork = new DrizzleTransactionUnitOfWork(database, () => now);
+    const createdId = randomUUID();
+
+    await expect(
+      unitOfWork.execute(async (context) => {
+        const lockedAssets = await context.lockAssets([assetId]);
+        expect(lockedAssets).toHaveLength(1);
+        const created = await context.transactions.create({
+          id: createdId,
+          assetId,
+          type: "BUY",
+          quantity: "1",
+          unitPrice: "1",
+          currency: "USD",
+          fees: "0",
+          transactionDate: "2025-01-06T00:00:00.000Z",
+          notes: null,
+        });
+        expect(await context.lockTransaction(created.id)).not.toBeNull();
+        throw new Error("rollback mutation");
+      }),
+    ).rejects.toThrow("rollback mutation");
+
+    expect(await transactions.getById(createdId)).toBeNull();
   });
 });

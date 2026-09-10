@@ -45,6 +45,16 @@ export class DrizzleTransactionRepository implements TransactionRepository {
     return row ? toDomainTransaction(row) : null;
   }
 
+  async lockById(id: string): Promise<Transaction | null> {
+    const [row] = await this.database
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, validateId("id", id)))
+      .for("update")
+      .limit(1);
+    return row ? toDomainTransaction(row) : null;
+  }
+
   async list(options: TransactionListOptions = {}): Promise<Transaction[]> {
     const assetId = options.assetId
       ? validateId("assetId", options.assetId)
