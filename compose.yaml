@@ -16,5 +16,81 @@ services:
       timeout: 5s
       retries: 10
 
+  app:
+    build:
+      context: .
+      target: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://portfolio:portfolio@postgres:5432/portfolio
+      NEXT_TELEMETRY_DISABLED: "1"
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - portfolio_app_node_modules:/app/node_modules
+      - portfolio_app_next:/app/.next
+      - portfolio_pnpm_store:/pnpm/store
+    command: ["sh", "-c", "pnpm db:migrate && pnpm dev"]
+
+  postgres-test:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: portfolio
+      POSTGRES_PASSWORD: portfolio
+      POSTGRES_DB: portfolio_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portfolio -d portfolio_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  test:
+    build:
+      context: .
+      target: test
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://portfolio:portfolio@postgres-test:5432/portfolio_test
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes:
+      - .:/app
+      - portfolio_test_node_modules:/app/node_modules
+      - portfolio_test_next:/app/.next
+      - portfolio_pnpm_store:/pnpm/store
+
+  test-watch:
+    profiles: ["test-watch"]
+    build:
+      context: .
+      target: test
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://portfolio:portfolio@postgres-test:5432/portfolio_test
+      CHOKIDAR_USEPOLLING: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+    stdin_open: true
+    tty: true
+    volumes:
+      - .:/app
+      - portfolio_test_node_modules:/app/node_modules
+      - portfolio_test_next:/app/.next
+      - portfolio_pnpm_store:/pnpm/store
+    command: ["sh", "-c", "pnpm db:migrate && pnpm exec vitest --watch"]
+
 volumes:
   portfolio_postgres_data:
+  portfolio_app_node_modules:
+  portfolio_app_next:
+  portfolio_test_node_modules:
+  portfolio_test_next:
+  portfolio_pnpm_store:
