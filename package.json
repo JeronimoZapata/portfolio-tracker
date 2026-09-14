@@ -21,8 +21,8 @@
     "db:check": "drizzle-kit check",
     "db:migrate": "drizzle-kit migrate",
     "docker:dev": "docker compose up --build app",
-    "docker:test": "docker compose run --rm test",
-    "docker:test:watch": "docker compose --profile test-watch up --build test-watch",
+    "docker:test": "docker compose build app && docker compose --profile test run --rm test",
+    "docker:test:watch": "docker compose build app && docker compose --profile test run --rm test sh -c \"pnpm db:migrate && pnpm exec vitest --watch\"",
     "test:db": "vitest run src/db"
   },
   "dependencies": {

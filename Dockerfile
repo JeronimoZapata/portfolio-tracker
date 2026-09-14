@@ -18,10 +18,3 @@ ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY . .
 CMD ["pnpm", "dev"]
-
-FROM dependencies AS test
-
-ENV NODE_ENV=test
-ENV NEXT_TELEMETRY_DISABLED=1
-COPY . .
-CMD ["sh", "-c", "pnpm db:migrate && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:ci && pnpm build"]
