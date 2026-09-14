@@ -17,6 +17,7 @@ services:
       retries: 10
 
   app:
+    image: portfolio-tracker-app:local
     build:
       context: .
       target: development
@@ -37,6 +38,7 @@ services:
     command: ["sh", "-c", "pnpm db:migrate && pnpm dev"]
 
   postgres-test:
+    profiles: ["test"]
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: portfolio
@@ -51,46 +53,32 @@ services:
       retries: 15
 
   test:
-    build:
-      context: .
-      target: test
+    profiles: ["test"]
+    image: portfolio-tracker-app:local
     depends_on:
       postgres-test:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://portfolio:portfolio@postgres-test:5432/portfolio_test
+      NODE_ENV: test
       NEXT_TELEMETRY_DISABLED: "1"
+      CHOKIDAR_USEPOLLING: "true"
     volumes:
       - .:/app
-      - portfolio_test_node_modules:/app/node_modules
-      - portfolio_test_next:/app/.next
+      - /app/node_modules
+      - /app/.next
       - portfolio_pnpm_store:/pnpm/store
-
-  test-watch:
-    profiles: ["test-watch"]
-    build:
-      context: .
-      target: test
-    depends_on:
-      postgres-test:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgresql://portfolio:portfolio@postgres-test:5432/portfolio_test
-      CHOKIDAR_USEPOLLING: "true"
-      NEXT_TELEMETRY_DISABLED: "1"
     stdin_open: true
     tty: true
-    volumes:
-      - .:/app
-      - portfolio_test_node_modules:/app/node_modules
-      - portfolio_test_next:/app/.next
-      - portfolio_pnpm_store:/pnpm/store
-    command: ["sh", "-c", "pnpm db:migrate && pnpm exec vitest --watch"]
+    command:
+      [
+        "sh",
+        "-c",
+        "pnpm db:migrate && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:ci && pnpm build",
+      ]
 
 volumes:
   portfolio_postgres_data:
   portfolio_app_node_modules:
   portfolio_app_next:
-  portfolio_test_node_modules:
-  portfolio_test_next:
   portfolio_pnpm_store:

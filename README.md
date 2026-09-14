@@ -17,22 +17,25 @@ pnpm dev
 
 ### Desarrollo y pruebas con Docker
 
-La imagen `development` ejecuta Next.js con el código montado desde el host,
-volúmenes Linux separados para dependencias y `.next`, y polling habilitado
-para conservar Fast Refresh:
+La imagen local `portfolio-tracker-app:local` ejecuta el runtime monolítico de
+Next.js (frontend y backend) con el código montado desde el host, volúmenes
+Linux separados para dependencias y `.next`, y polling habilitado para
+conservar Fast Refresh:
 
 ```bash
 pnpm docker:dev
 ```
 
-Las pruebas usan otra imagen y un PostgreSQL efímero sin puerto publicado. El
-runner aplica las migraciones y ejecuta formato, lint, tipos, tests y build:
+Las pruebas reutilizan la misma imagen `portfolio-tracker-app:local` en un
+contenedor runner efímero y un PostgreSQL efímero sin puerto publicado. No se
+construye una imagen específica para tests. El runner aplica las migraciones y
+ejecuta formato, lint, tipos, tests y build:
 
 ```bash
 pnpm docker:test
 ```
 
-Para dejar Vitest observando cambios en caliente:
+Para dejar Vitest observando cambios en caliente usando la misma imagen:
 
 ```bash
 pnpm docker:test:watch
