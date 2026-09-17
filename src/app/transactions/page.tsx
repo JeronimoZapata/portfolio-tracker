@@ -90,7 +90,7 @@ export default async function TransactionsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <TransactionTable rows={data.transactions} />
+            <TransactionTable rows={data.transactions} assets={data.assets} />
           </CardContent>
         </Card>
       </div>

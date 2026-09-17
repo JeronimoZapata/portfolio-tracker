@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 
-import type { Asset } from "@/domain/portfolio";
+import type { Asset, Transaction } from "@/domain/portfolio";
 import {
   createTransactionAction,
   initialTransactionActionState,
+  updateTransactionAction,
 } from "./actions";
 import type {
   TransactionActionState,
@@ -14,8 +15,14 @@ import type {
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
 
-type TransactionFormProps = {
-  readonly assets: Asset[];
+type TransactionFormProps = { readonly assets: Asset[] };
+type TransactionFormFieldsProps = TransactionFormProps & {
+  readonly action: (formData: FormData) => void;
+  readonly state: TransactionActionState;
+  readonly pending: boolean;
+  readonly mode: "create" | "edit";
+  readonly transaction?: Transaction;
+  readonly onCancel?: () => void;
 };
 
 function pad(value: number): string {
@@ -27,9 +34,15 @@ export function localDateTimeToIso(value: string): string {
   return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
 }
 
+export function isoToLocalDateTime(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}:${pad(parsed.getSeconds())}`;
+}
+
 function currentLocalDateTime(): string {
   const now = new Date();
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 }
 
 function ErrorText({
@@ -47,24 +60,29 @@ function ErrorText({
   ) : null;
 }
 
-type TransactionFormFieldsProps = TransactionFormProps & {
-  readonly action: (formData: FormData) => void;
-  readonly state: TransactionActionState;
-  readonly pending: boolean;
-};
-
 function TransactionFormFields({
   assets,
   action,
   state,
   pending,
+  mode,
+  transaction,
+  onCancel,
 }: TransactionFormFieldsProps) {
-  const formRef = useRef<HTMLFormElement>(null);
-  const [dateLocal, setDateLocal] = useState(currentLocalDateTime);
-  const [dateIso, setDateIso] = useState(() =>
-    localDateTimeToIso(currentLocalDateTime()),
-  );
   const hasAssets = assets.length > 0;
+  const prefix = mode === "edit" ? `edit-${transaction?.id}` : "create";
+  const initialDateIso =
+    transaction?.transactionDate ?? localDateTimeToIso(currentLocalDateTime());
+  const [dateLocal, setDateLocal] = useState(
+    transaction
+      ? isoToLocalDateTime(transaction.transactionDate)
+      : currentLocalDateTime(),
+  );
+  const [dateIso, setDateIso] = useState(initialDateIso);
+
+  useEffect(() => {
+    if (mode === "edit" && state.status === "success") onCancel?.();
+  }, [mode, onCancel, state.status]);
 
   function handleDateChange(value: string) {
     setDateLocal(value);
@@ -72,12 +90,24 @@ function TransactionFormFields({
   }
 
   return (
-    <form ref={formRef} action={action} className="space-y-5">
+    <form action={action} className="space-y-5">
+      {mode === "edit" ? (
+        <input
+          type="hidden"
+          name="transactionId"
+          value={transaction?.id ?? ""}
+        />
+      ) : null}
       <fieldset disabled={!hasAssets || pending} className="space-y-5">
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="assetId">Activo</Label>
-            <Select id="assetId" name="assetId" defaultValue="" required>
+            <Label htmlFor={`${prefix}-assetId`}>Activo</Label>
+            <Select
+              id={`${prefix}-assetId`}
+              name="assetId"
+              defaultValue={transaction?.assetId ?? ""}
+              required
+            >
               <option value="" disabled>
                 Seleccioná un activo
               </option>
@@ -89,104 +119,135 @@ function TransactionFormFields({
             </Select>
             <ErrorText field="assetId" state={state} />
           </div>
-
           <div className="space-y-2">
-            <Label htmlFor="type">Tipo de operación</Label>
-            <Select id="type" name="type" defaultValue="BUY" required>
+            <Label htmlFor={`${prefix}-type`}>Tipo de operación</Label>
+            <Select
+              id={`${prefix}-type`}
+              name="type"
+              defaultValue={transaction?.type ?? "BUY"}
+              required
+            >
               <option value="BUY">BUY · Compra</option>
               <option value="SELL">SELL · Venta</option>
             </Select>
             <ErrorText field="type" state={state} />
           </div>
-
           <div className="space-y-2">
-            <Label htmlFor="transactionDateLocal">Fecha y hora</Label>
+            <Label htmlFor={`${prefix}-transactionDateLocal`}>
+              Fecha y hora
+            </Label>
             <Input
-              id="transactionDateLocal"
+              id={`${prefix}-transactionDateLocal`}
               type="datetime-local"
+              step="1"
               value={dateLocal}
               onChange={(event) => handleDateChange(event.target.value)}
               required
-              aria-describedby="transactionDate-help"
+              aria-describedby={`${prefix}-transactionDate-help`}
             />
             <input type="hidden" name="transactionDate" value={dateIso} />
-            <p id="transactionDate-help" className="text-xs text-slate-500">
+            <p
+              id={`${prefix}-transactionDate-help`}
+              className="text-xs text-slate-500"
+            >
               Se guarda como timestamp ISO con zona horaria.
             </p>
             <ErrorText field="transactionDate" state={state} />
           </div>
-
           <div className="space-y-2">
-            <Label htmlFor="quantity">Cantidad</Label>
+            <Label htmlFor={`${prefix}-quantity`}>Cantidad</Label>
             <Input
-              id="quantity"
+              id={`${prefix}-quantity`}
               name="quantity"
               type="text"
               inputMode="decimal"
               placeholder="0.00000000"
+              defaultValue={transaction?.quantity ?? ""}
               required
-              aria-describedby="quantity-help"
+              aria-describedby={`${prefix}-quantity-help`}
             />
-            <p id="quantity-help" className="text-xs text-slate-500">
+            <p
+              id={`${prefix}-quantity-help`}
+              className="text-xs text-slate-500"
+            >
               Podés usar hasta 18 decimales.
             </p>
             <ErrorText field="quantity" state={state} />
           </div>
-
           <div className="space-y-2">
-            <Label htmlFor="unitPrice">Precio unitario (USD)</Label>
+            <Label htmlFor={`${prefix}-unitPrice`}>Precio unitario (USD)</Label>
             <Input
-              id="unitPrice"
+              id={`${prefix}-unitPrice`}
               name="unitPrice"
               type="text"
               inputMode="decimal"
               placeholder="0.00"
+              defaultValue={transaction?.unitPrice ?? ""}
               required
             />
             <ErrorText field="unitPrice" state={state} />
           </div>
-
           <div className="space-y-2">
-            <Label htmlFor="fees">Comisión</Label>
-            <Input id="fees" value="0" readOnly aria-readonly="true" />
+            <Label htmlFor={`${prefix}-fees`}>Comisión</Label>
+            <Input
+              id={`${prefix}-fees`}
+              value="0"
+              readOnly
+              aria-readonly="true"
+            />
             <p className="text-xs text-slate-500">
               La comisión es fija en 0 por ahora.
             </p>
           </div>
-
           <div className="space-y-2">
-            <Label htmlFor="currency">Moneda</Label>
-            <Input id="currency" value="USD" readOnly aria-readonly="true" />
+            <Label htmlFor={`${prefix}-currency`}>Moneda</Label>
+            <Input
+              id={`${prefix}-currency`}
+              value="USD"
+              readOnly
+              aria-readonly="true"
+            />
           </div>
-
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="notes">Notas (opcional)</Label>
+            <Label htmlFor={`${prefix}-notes`}>Notas (opcional)</Label>
             <Textarea
-              id="notes"
+              id={`${prefix}-notes`}
               name="notes"
               placeholder="Ej. Compra periódica"
               rows={3}
+              defaultValue={transaction?.notes ?? ""}
             />
             <ErrorText field="notes" state={state} />
           </div>
         </div>
-
-        <Button
-          type="submit"
-          disabled={!hasAssets || pending}
-          className="w-full sm:w-auto"
-        >
-          {pending ? "Guardando…" : "Guardar operación"}
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <Button type="submit" disabled={!hasAssets || pending}>
+            {pending
+              ? mode === "edit"
+                ? "Guardando cambios…"
+                : "Guardando…"
+              : mode === "edit"
+                ? "Guardar cambios"
+                : "Guardar operación"}
+          </Button>
+          {mode === "edit" ? (
+            <Button
+              type="button"
+              disabled={pending}
+              onClick={onCancel}
+              className="bg-slate-200 text-slate-800 hover:bg-slate-300"
+            >
+              Cancelar
+            </Button>
+          ) : null}
+        </div>
       </fieldset>
-
       {!hasAssets ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           Todavía no hay activos disponibles. Cargá un activo antes de registrar
           una operación.
         </p>
       ) : null}
-
       {state.status === "success" ? (
         <p
           className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
@@ -214,14 +275,39 @@ export function TransactionForm({ assets }: TransactionFormProps) {
     createTransactionAction,
     initialTransactionActionState,
   );
-  const formKey = state.transactionId ?? "draft";
   return (
     <TransactionFormFields
-      key={formKey}
+      key={state.transactionId ?? "draft"}
       assets={assets}
       action={formAction}
       state={state}
       pending={pending}
+      mode="create"
+    />
+  );
+}
+
+export function EditTransactionForm({
+  assets,
+  transaction,
+  onCancel,
+}: TransactionFormProps & {
+  readonly transaction: Transaction;
+  readonly onCancel: () => void;
+}) {
+  const [state, formAction, pending] = useActionState(
+    updateTransactionAction,
+    initialTransactionActionState,
+  );
+  return (
+    <TransactionFormFields
+      assets={assets}
+      transaction={transaction}
+      action={formAction}
+      state={state}
+      pending={pending}
+      mode="edit"
+      onCancel={onCancel}
     />
   );
 }
