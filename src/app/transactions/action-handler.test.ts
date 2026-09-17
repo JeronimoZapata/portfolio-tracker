@@ -1,12 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  runDeleteTransactionAction,
   runCreateTransactionAction,
+  runUpdateTransactionAction,
+  transactionIdFromFormData,
   transactionCommandFromFormData,
   type TransactionActionState,
 } from "./action-handler";
 import {
   AssetNotFoundError,
+  TransactionNotFoundError,
   TransactionValidationError,
 } from "@/application/transactions";
 import { OversellError } from "@/domain/portfolio";
@@ -151,5 +155,109 @@ describe("transaction form action handler", () => {
       status: "error",
       message: "No pudimos guardar la operación. Intentá nuevamente.",
     });
+  });
+
+  it("maps and runs an update with the transaction id and fixed MVP values", async () => {
+    const form = formData({ notes: "   " });
+    form.set("transactionId", TRANSACTION_ID);
+    const execute = vi.fn(async () => createdTransaction());
+    const invalidate = vi.fn();
+
+    const result = await runUpdateTransactionAction(
+      baseState,
+      form,
+      { execute },
+      invalidate,
+    );
+
+    expect(execute).toHaveBeenCalledWith(TRANSACTION_ID, {
+      assetId: ASSET_ID,
+      type: "BUY",
+      quantity: "0.00015382",
+      unitPrice: "123.45",
+      transactionDate: "2026-09-10T18:00:00.000Z",
+      currency: "USD",
+      fees: "0",
+      notes: null,
+    });
+    expect(transactionIdFromFormData(form)).toBe(TRANSACTION_ID);
+    expect(invalidate).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      status: "success",
+      transactionId: TRANSACTION_ID,
+    });
+  });
+
+  it("translates update-specific not-found and oversell errors", async () => {
+    const form = formData();
+    form.set("transactionId", TRANSACTION_ID);
+    const notFound = await runUpdateTransactionAction(
+      baseState,
+      form,
+      {
+        execute: vi.fn(async () => {
+          throw new TransactionNotFoundError(TRANSACTION_ID);
+        }),
+      },
+      vi.fn(),
+    );
+    expect(notFound.message).toContain("ya no existe");
+
+    const oversell = await runUpdateTransactionAction(
+      baseState,
+      form,
+      {
+        execute: vi.fn(async () => {
+          throw new OversellError(TRANSACTION_ID, "2", "1");
+        }),
+      },
+      vi.fn(),
+    );
+    expect(oversell.message).toContain("venta posterior");
+  });
+
+  it("deletes and revalidates only after a successful mutation", async () => {
+    const form = new FormData();
+    form.set("transactionId", TRANSACTION_ID);
+    const execute = vi.fn(async () => createdTransaction());
+    const invalidate = vi.fn();
+    const result = await runDeleteTransactionAction(
+      { status: "idle" },
+      form,
+      { execute },
+      invalidate,
+    );
+
+    expect(execute).toHaveBeenCalledWith(TRANSACTION_ID);
+    expect(invalidate).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      status: "success",
+      transactionId: TRANSACTION_ID,
+    });
+
+    const rejected = await runDeleteTransactionAction(
+      { status: "idle" },
+      form,
+      {
+        execute: vi.fn(async () => {
+          throw new OversellError(TRANSACTION_ID, "1", "0");
+        }),
+      },
+      invalidate,
+    );
+    expect(rejected.status).toBe("error");
+    expect(rejected.message).toContain("no se puede eliminar");
+
+    const missing = await runDeleteTransactionAction(
+      { status: "idle" },
+      form,
+      {
+        execute: vi.fn(async () => {
+          throw new TransactionNotFoundError(TRANSACTION_ID);
+        }),
+      },
+      invalidate,
+    );
+    expect(missing.message).toContain("ya no existe");
   });
 });

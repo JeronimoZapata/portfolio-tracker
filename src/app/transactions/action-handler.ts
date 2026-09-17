@@ -1,9 +1,13 @@
 import { OversellError } from "@/domain/portfolio";
 import {
   AssetNotFoundError,
+  TransactionNotFoundError,
   TransactionValidationError,
 } from "@/application/transactions";
-import type { CreateTransactionCommand } from "@/application/transactions";
+import type {
+  CreateTransactionCommand,
+  UpdateTransactionCommand,
+} from "@/application/transactions";
 import type { Transaction } from "@/domain/portfolio";
 
 export type TransactionActionStatus = "idle" | "success" | "error";
@@ -12,6 +16,12 @@ export type TransactionActionState = {
   readonly status: TransactionActionStatus;
   readonly message?: string;
   readonly fieldErrors?: Partial<Record<TransactionFormField, string>>;
+  readonly transactionId?: string;
+};
+
+export type DeleteTransactionActionState = {
+  readonly status: TransactionActionStatus;
+  readonly message?: string;
   readonly transactionId?: string;
 };
 
@@ -24,6 +34,14 @@ export const initialTransactionActionState: TransactionActionState = {
 
 type TransactionExecutor = {
   execute(input: CreateTransactionCommand): Promise<Transaction>;
+};
+
+type UpdateTransactionExecutor = {
+  execute(id: string, input: UpdateTransactionCommand): Promise<Transaction>;
+};
+
+type DeleteTransactionExecutor = {
+  execute(id: string): Promise<Transaction>;
 };
 
 export function transactionCommandFromFormData(
@@ -44,6 +62,17 @@ export function transactionCommandFromFormData(
     fees: "0",
     notes: value("notes") || null,
   };
+}
+
+export function transactionIdFromFormData(formData: FormData): string {
+  const raw = formData.get("transactionId");
+  return typeof raw === "string" ? raw.trim() : "";
+}
+
+export function updateTransactionCommandFromFormData(
+  formData: FormData,
+): UpdateTransactionCommand {
+  return transactionCommandFromFormData(formData);
 }
 
 function fieldForValidationError(
@@ -83,12 +112,51 @@ function validationMessage(field: TransactionFormField | undefined): string {
 
 export function unexpectedTransactionActionState(
   error: unknown,
+  operation: "create" | "update" = "create",
 ): TransactionActionState {
-  console.error("Unable to create transaction.", error);
+  console.error(`Unable to ${operation} transaction.`, error);
   return {
     status: "error",
     message: "No pudimos guardar la operación. Intentá nuevamente.",
   };
+}
+
+function transactionErrorState(
+  error: unknown,
+  operation: "create" | "update",
+): TransactionActionState {
+  if (error instanceof TransactionValidationError) {
+    const field = fieldForValidationError(error.field);
+    return {
+      status: "error",
+      message: validationMessage(field),
+      fieldErrors: field ? { [field]: validationMessage(field) } : undefined,
+    };
+  }
+  if (error instanceof AssetNotFoundError) {
+    return {
+      status: "error",
+      message: "El activo seleccionado ya no está disponible.",
+      fieldErrors: { assetId: "El activo seleccionado ya no está disponible." },
+    };
+  }
+  if (error instanceof TransactionNotFoundError) {
+    return {
+      status: "error",
+      message:
+        "La operación ya no existe. Actualizá la lista e intentá nuevamente.",
+    };
+  }
+  if (error instanceof OversellError) {
+    return {
+      status: "error",
+      message:
+        operation === "create"
+          ? "La venta supera la posición disponible para este activo."
+          : "Los cambios invalidan una venta posterior porque dejarían una cantidad insuficiente.",
+    };
+  }
+  return unexpectedTransactionActionState(error, operation);
 }
 
 export async function runCreateTransactionAction(
@@ -116,32 +184,87 @@ export async function runCreateTransactionAction(
       transactionId: created.id,
     };
   } catch (error) {
-    if (error instanceof TransactionValidationError) {
-      const field = fieldForValidationError(error.field);
-      return {
-        status: "error",
-        message: validationMessage(field),
-        fieldErrors: field ? { [field]: validationMessage(field) } : undefined,
-      };
-    }
+    return transactionErrorState(error, "create");
+  }
+}
 
-    if (error instanceof AssetNotFoundError) {
-      return {
-        status: "error",
-        message: "El activo seleccionado ya no está disponible.",
-        fieldErrors: {
-          assetId: "El activo seleccionado ya no está disponible.",
-        },
-      };
+export async function runUpdateTransactionAction(
+  _previousState: TransactionActionState,
+  formData: FormData,
+  executor: UpdateTransactionExecutor,
+  invalidate: () => void,
+): Promise<TransactionActionState> {
+  try {
+    const transactionId = transactionIdFromFormData(formData);
+    const updated = await executor.execute(
+      transactionId,
+      updateTransactionCommandFromFormData(formData),
+    );
+    try {
+      invalidate();
+    } catch (error) {
+      console.error("Unable to revalidate transactions page.", error);
     }
+    return {
+      status: "success",
+      message: "La operación se actualizó correctamente.",
+      transactionId: updated.id,
+    };
+  } catch (error) {
+    return transactionErrorState(error, "update");
+  }
+}
 
-    if (error instanceof OversellError) {
-      return {
-        status: "error",
-        message: "La venta supera la posición disponible para este activo.",
-      };
+function deleteTransactionErrorState(
+  error: unknown,
+): DeleteTransactionActionState {
+  if (error instanceof TransactionNotFoundError) {
+    return {
+      status: "error",
+      message:
+        "La operación ya no existe. Actualizá la lista e intentá nuevamente.",
+    };
+  }
+  if (error instanceof OversellError) {
+    return {
+      status: "error",
+      message:
+        "La operación no se puede eliminar porque dejaría una venta posterior sin cantidad suficiente.",
+    };
+  }
+  if (error instanceof TransactionValidationError) {
+    return {
+      status: "error",
+      message: "La operación seleccionada no es válida.",
+    };
+  }
+  console.error("Unable to delete transaction.", error);
+  return {
+    status: "error",
+    message: "No pudimos eliminar la operación. Intentá nuevamente.",
+  };
+}
+
+export async function runDeleteTransactionAction(
+  _previousState: DeleteTransactionActionState,
+  formData: FormData,
+  executor: DeleteTransactionExecutor,
+  invalidate: () => void,
+): Promise<DeleteTransactionActionState> {
+  try {
+    const transactionId = transactionIdFromFormData(formData);
+    const deleted = await executor.execute(transactionId);
+    try {
+      invalidate();
+    } catch (error) {
+      console.error("Unable to revalidate transactions page.", error);
     }
-
-    return unexpectedTransactionActionState(error);
+    return {
+      status: "success",
+      message: "La operación se eliminó correctamente.",
+      transactionId: deleted.id,
+    };
+  } catch (error) {
+    return deleteTransactionErrorState(error);
   }
 }

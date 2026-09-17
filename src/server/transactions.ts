@@ -1,6 +1,12 @@
 import "./server-only";
 
-import { CreateTransaction, ListAssets, ListTransactions } from "@/application";
+import {
+  CreateTransaction,
+  DeleteTransaction,
+  ListAssets,
+  ListTransactions,
+  UpdateTransaction,
+} from "@/application";
 import type { Asset, Transaction } from "@/domain/portfolio";
 
 export type TransactionListItem = {
@@ -25,13 +31,14 @@ export async function getTransactionServices() {
 
   const assets = new DrizzleAssetRepository(db);
   const transactions = new DrizzleTransactionRepository(db);
+  const unitOfWork = new DrizzleTransactionUnitOfWork(db);
 
   return {
     listAssets: new ListAssets(assets),
     listTransactions: new ListTransactions(assets, transactions),
-    createTransaction: new CreateTransaction(
-      new DrizzleTransactionUnitOfWork(db),
-    ),
+    createTransaction: new CreateTransaction(unitOfWork),
+    updateTransaction: new UpdateTransaction(unitOfWork),
+    deleteTransaction: new DeleteTransaction(unitOfWork),
   };
 }
 

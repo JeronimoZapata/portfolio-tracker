@@ -43,9 +43,12 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.3.4",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "prettier": "^3.9.6",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "jsdom": "^27.0.0"
   }
 }
