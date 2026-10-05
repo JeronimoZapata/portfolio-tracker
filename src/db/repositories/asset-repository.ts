@@ -1,4 +1,4 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 
 import type { Database } from "../index";
 import { assets } from "../schema";
@@ -10,6 +10,12 @@ import type {
   CreateAssetInput,
   UpdateAssetInput,
 } from "./types";
+import {
+  AssetDuplicateError,
+  AssetInUseError,
+  isAssetIdentifierUniqueViolation,
+  isAssetReferenceViolation,
+} from "./errors";
 
 export type Clock = () => Date;
 
@@ -21,10 +27,21 @@ export class DrizzleAssetRepository implements AssetRepository {
 
   async create(input: CreateAssetInput): Promise<Asset> {
     const values = validateAssetInput({ ...input }, false) as CreateAssetInput;
-    const [row] = await this.database
-      .insert(assets)
-      .values({ ...values, updatedAt: this.clock() })
-      .returning();
+    let row: typeof assets.$inferSelect | undefined;
+    try {
+      [row] = await this.database
+        .insert(assets)
+        .values({ ...values, updatedAt: this.clock() })
+        .returning();
+    } catch (error) {
+      if (isAssetIdentifierUniqueViolation(error)) {
+        throw new AssetDuplicateError(
+          values.provider,
+          values.providerIdentifier,
+        );
+      }
+      throw error;
+    }
     if (!row) throw new Error("Asset insert did not return a row.");
     return toDomainAsset(row);
   }
@@ -34,6 +51,23 @@ export class DrizzleAssetRepository implements AssetRepository {
       .select()
       .from(assets)
       .where(eq(assets.id, validateId("id", id)))
+      .limit(1);
+    return row ? toDomainAsset(row) : null;
+  }
+
+  async findByProviderIdentifier(
+    provider: CreateAssetInput["provider"],
+    providerIdentifier: string,
+  ): Promise<Asset | null> {
+    const [row] = await this.database
+      .select()
+      .from(assets)
+      .where(
+        and(
+          eq(assets.provider, provider),
+          eq(assets.providerIdentifier, providerIdentifier.trim()),
+        ),
+      )
       .limit(1);
     return row ? toDomainAsset(row) : null;
   }
@@ -102,19 +136,37 @@ export class DrizzleAssetRepository implements AssetRepository {
     }
     if (input.currency !== undefined) changedValues.currency = values.currency;
     if (input.exchange !== undefined) changedValues.exchange = values.exchange;
-    const [row] = await this.database
-      .update(assets)
-      .set({ ...changedValues, updatedAt: this.clock() })
-      .where(eq(assets.id, assetId))
-      .returning();
+    let row: typeof assets.$inferSelect | undefined;
+    try {
+      [row] = await this.database
+        .update(assets)
+        .set({ ...changedValues, updatedAt: this.clock() })
+        .where(eq(assets.id, assetId))
+        .returning();
+    } catch (error) {
+      if (isAssetIdentifierUniqueViolation(error)) {
+        throw new AssetDuplicateError(
+          values.provider ?? existing.provider,
+          values.providerIdentifier ?? existing.providerIdentifier,
+        );
+      }
+      throw error;
+    }
     return row ? toDomainAsset(row) : null;
   }
 
   async delete(id: string): Promise<boolean> {
-    const rows = await this.database
-      .delete(assets)
-      .where(eq(assets.id, validateId("id", id)))
-      .returning({ id: assets.id });
-    return rows.length === 1;
+    try {
+      const rows = await this.database
+        .delete(assets)
+        .where(eq(assets.id, validateId("id", id)))
+        .returning({ id: assets.id });
+      return rows.length === 1;
+    } catch (error) {
+      if (isAssetReferenceViolation(error)) {
+        throw new AssetInUseError(id);
+      }
+      throw error;
+    }
   }
 }
