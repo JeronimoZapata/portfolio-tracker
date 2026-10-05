@@ -78,6 +78,19 @@ pnpm build
 
 `test:ci` ejecuta la suite de pruebas de lógica de negocio con Vitest.
 
+### Búsqueda de activos
+
+La pantalla `/assets` obtiene la identidad del activo desde los proveedores y
+no permite escribir manualmente el identificador. Para habilitar las búsquedas
+locales, completá en `.env.local` las variables server-only de `.env.example`:
+
+- `ALPACA_API_KEY` y `ALPACA_API_SECRET`: credenciales de una cuenta Paper;
+  la aplicación sólo consulta `GET /v2/assets/{symbol_or_asset_id}`.
+- `COINGECKO_API_KEY`: clave del plan Demo para buscar y resolver monedas.
+
+Si las credenciales no están configuradas, `/assets` seguirá cargando los
+activos existentes, pero las búsquedas nuevas mostrarán un error del proveedor.
+
 ## Flujo de trabajo
 
 Cada cambio se desarrolla en un task branch y se integra a `main` mediante un

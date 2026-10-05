@@ -10,6 +10,7 @@ import type { Database } from "../index";
 import { DrizzleAssetRepository } from "./asset-repository";
 import { DrizzleTransactionRepository } from "./transaction-repository";
 import { DrizzleTransactionUnitOfWork } from "../transaction-unit-of-work";
+import { AssetDuplicateError, AssetInUseError } from "./errors";
 
 config({ path: ".env.local" });
 config();
@@ -52,6 +53,17 @@ run("Drizzle repositories", () => {
     const created = await assets.getById(assetId);
     expect(created?.name).toBe("Repository test asset");
     expect(created?.currency).toBe("USD");
+    expect(
+      (
+        await assets.findByProviderIdentifier(
+          "ALPACA",
+          created?.providerIdentifier ?? "",
+        )
+      )?.id,
+    ).toBe(assetId);
+    await expect(
+      assets.findByProviderIdentifier("ALPACA", "missing-provider-identifier"),
+    ).resolves.toBeNull();
 
     const createdAt = created?.createdAt;
     now = new Date("2025-01-02T00:00:00.000Z");
@@ -72,6 +84,16 @@ run("Drizzle repositories", () => {
     });
     expect(await assets.delete(disposable.id)).toBe(true);
     expect(await assets.delete(disposable.id)).toBe(false);
+
+    await expect(
+      assets.create({
+        symbol: "DUPLICATE",
+        name: "Duplicate asset",
+        type: "STOCK",
+        provider: "ALPACA",
+        providerIdentifier: created?.providerIdentifier ?? "",
+      }),
+    ).rejects.toBeInstanceOf(AssetDuplicateError);
   });
 
   it("performs transaction CRUD, preserves decimals, and orders ties by id", async () => {
@@ -122,7 +144,9 @@ run("Drizzle repositories", () => {
       transactionDate: "2025-01-05T00:00:00.000Z",
     });
     transactionIds.push(transaction.id);
-    await expect(assets.delete(assetId)).rejects.toThrow();
+    await expect(assets.delete(assetId)).rejects.toBeInstanceOf(
+      AssetInUseError,
+    );
   });
 
   it("provides an atomic, row-locked transaction mutation context", async () => {

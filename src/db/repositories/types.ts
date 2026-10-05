@@ -21,6 +21,10 @@ export type UpdateAssetInput = Partial<CreateAssetInput>;
 export interface AssetRepository {
   create(input: CreateAssetInput): Promise<Asset>;
   getById(id: string): Promise<Asset | null>;
+  findByProviderIdentifier(
+    provider: AssetProvider,
+    providerIdentifier: string,
+  ): Promise<Asset | null>;
   list(): Promise<Asset[]>;
   update(id: string, input: UpdateAssetInput): Promise<Asset | null>;
   delete(id: string): Promise<boolean>;
