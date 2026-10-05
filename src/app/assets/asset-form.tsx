@@ -140,10 +140,7 @@ function AssetFormFields({
 
   useEffect(() => {
     if (!debouncePending) return;
-    if (!searchQuery.trim() || selectedIdentifier) {
-      setDebouncePending(false);
-      return;
-    }
+    if (!searchQuery.trim() || selectedIdentifier) return;
     const timeout = setTimeout(() => {
       setDebouncePending(false);
       void searchProvider();
